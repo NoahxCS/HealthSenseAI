@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Stethoscope, AlertTriangle, CheckCircle2, DollarSign, Pill } from "lucide-react";
+import { FileText, Stethoscope, AlertTriangle, CheckCircle2, IndianRupee, Pill } from "lucide-react";
 import type { AnalyzeMedicalBillOutput } from "@/ai/flows/analyze-medical-bill";
 import type { AnalyzePrescriptionOutput } from "@/ai/flows/analyze-prescription";
 
@@ -25,14 +25,14 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
               <FileText className="h-5 w-5" />
               <CardTitle className="text-xl">Bill Analysis Summary</CardTitle>
             </div>
-            <CardDescription>Estimated potential savings based on market rates</CardDescription>
+            <CardDescription>Estimated potential savings based on Indian market fair rates</CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-accent/10 p-4 rounded-lg mb-6">
               <div className="text-center md:text-left">
                 <p className="text-sm text-muted-foreground">Total Possible Savings</p>
                 <p className="text-3xl font-bold text-primary flex items-center justify-center md:justify-start">
-                  <DollarSign className="h-6 w-6" />
+                  <IndianRupee className="h-6 w-6" />
                   {(billData.totalPossibleSavings ?? 0).toFixed(2)}
                 </p>
               </div>
@@ -58,11 +58,11 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
                       <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                         <div>
                           <p className="text-muted-foreground">Billed Price</p>
-                          <p className="font-semibold">${(item.billedPrice ?? 0).toFixed(2)}</p>
+                          <p className="font-semibold">₹{(item.billedPrice ?? 0).toFixed(2)}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Fair Estimate</p>
-                          <p className="font-semibold text-green-600">${(item.fairPriceEstimate ?? 0).toFixed(2)}</p>
+                          <p className="font-semibold text-green-600">₹{(item.fairPriceEstimate ?? 0).toFixed(2)}</p>
                         </div>
                       </div>
                       <p className="text-sm text-muted-foreground bg-slate-50 p-2 rounded border-l-2 border-primary">
