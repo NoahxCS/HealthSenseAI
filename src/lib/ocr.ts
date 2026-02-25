@@ -3,7 +3,7 @@
  * OCR.space API integration helper
  */
 
-const OCR_API_KEY = process.env.NEXT_PUBLIC_OCR_API_KEY || "K82976477288957";
+const OCR_API_KEY = process.env.NEXT_PUBLIC_OCR_API_KEY;
 
 export interface OCRResult {
   text: string;
@@ -11,6 +11,10 @@ export interface OCRResult {
 }
 
 export async function extractTextFromFile(file: File): Promise<OCRResult> {
+  if (!OCR_API_KEY) {
+    return { text: "", error: "OCR API Key is missing. Please check your environment variables." };
+  }
+
   const formData = new FormData();
   formData.append("file", file);
   formData.append("apikey", OCR_API_KEY);
