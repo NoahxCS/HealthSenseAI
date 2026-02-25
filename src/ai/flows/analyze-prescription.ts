@@ -35,33 +35,46 @@ const analyzePrescriptionFlow = ai.defineFlow(
     outputSchema: AnalyzePrescriptionOutputSchema,
   },
   async (input) => {
-    const prompt = `You are a medical assistant analyzing prescription text. Extract medicine details and return a JSON array of objects strictly matching the schema.
+    try {
+      const prompt = `You are a medical assistant analyzing prescription text. Extract medicine details and return a JSON array of objects strictly matching the schema.
+      Return ONLY valid JSON.
+      
+      Prescription Text:
+      ${input.prescriptionText}`;
 
-Prescription Text:
-${input.prescriptionText}`;
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://genkit.dev",
+          "X-Title": "HealthSense AI"
+        },
+        body: JSON.stringify({
+          model: "openrouter/free",
+          messages: [{ role: "user", content: prompt }],
+          response_format: { type: "json_object" }
+        })
+      });
 
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://genkit.dev",
-        "X-Title": "HealthSense AI"
-      },
-      body: JSON.stringify({
-        model: "openrouter/free",
-        messages: [{ role: "user", content: prompt }],
-        response_format: { type: "json_object" }
-      })
-    });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`OpenRouter API Error: ${response.status} - ${errorText}`);
+      }
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`OpenRouter Error: ${error}`);
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+
+      if (!content) {
+        throw new Error("Empty response received from AI model.");
+      }
+
+      // Robust JSON extraction
+      const cleanedContent = content.replace(/```json\n?/, '').replace(/\n?```/, '').trim();
+      return JSON.parse(cleanedContent) as AnalyzePrescriptionOutput;
+    } catch (error: any) {
+      console.error("Prescription Analysis Flow Error:", error);
+      throw new Error(`Failed to analyze prescription: ${error.message}`);
     }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content;
-    return JSON.parse(content) as AnalyzePrescriptionOutput;
   }
 );

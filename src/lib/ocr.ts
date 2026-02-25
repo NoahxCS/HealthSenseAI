@@ -4,7 +4,7 @@
  * OCR.space API integration helper (Server-side)
  */
 
-const OCR_API_KEY = process.env.OCR_API_KEY || process.env.NEXT_PUBLIC_OCR_API_KEY;
+const OCR_API_KEY = process.env.OCR_API_KEY;
 
 export interface OCRResult {
   text: string;
@@ -12,10 +12,10 @@ export interface OCRResult {
 }
 
 export async function extractTextFromFile(formData: FormData): Promise<OCRResult> {
-  if (!OCR_API_KEY || OCR_API_KEY === 'your_ocr_api_key_here') {
+  if (!OCR_API_KEY) {
     return { 
       text: "", 
-      error: "OCR API Key is missing or invalid. Please set OCR_API_KEY in your environment variables." 
+      error: "OCR API Key is missing. Please set OCR_API_KEY in your environment variables." 
     };
   }
 
@@ -30,11 +30,11 @@ export async function extractTextFromFile(formData: FormData): Promise<OCRResult
     const response = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       body: formData,
+      // Adding a timeout signal if needed, though Next.js has its own limits
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("OCR API Error Response:", errorText);
       throw new Error(`OCR Service Error: ${response.status} ${response.statusText}`);
     }
 
