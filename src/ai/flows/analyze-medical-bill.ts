@@ -2,6 +2,7 @@
 /**
  * @fileOverview A Genkit flow for analyzing medical bills via OpenRouter.
  * Updated to process ALL items and categorize them by price status.
+ * Enhanced normalization to prevent schema validation failures.
  */
 
 import { ai } from '@/ai/genkit';
@@ -96,11 +97,15 @@ const analyzeMedicalBillFlow = ai.defineFlow(
       
       ${fairPriceReference}
 
-      STATUS CRITERIA:
-      - 'overpriced': Billed price is SIGNIFICANTLY HIGHER than the UPPER BOUND of the reference range.
-      - 'fair': Billed price is WITHIN or slightly around the reference range.
-      - 'undercharged': Billed price is SIGNIFICANTLY LOWER than the lower bound.
-      - 'unknown': Item is not in the reference list.
+      CRITICAL INSTRUCTIONS:
+      1. STATUS CRITERIA:
+         - 'overpriced': Billed price is SIGNIFICANTLY HIGHER than the UPPER BOUND of the reference range.
+         - 'fair': Billed price is WITHIN or slightly around the reference range.
+         - 'undercharged': Billed price is SIGNIFICANTLY LOWER than the lower bound.
+         - 'unknown': Item is not in the reference list.
+      2. NUMERIC VALUES: All prices must be numbers. DO NOT return null or strings for numeric fields.
+      3. RECOMMENDATIONS: Must be an ARRAY of strings.
+      4. RESPONSE FORMAT: Return ONLY the JSON object.
 
       Return a JSON object:
       {
@@ -140,11 +145,14 @@ const analyzeMedicalBillFlow = ai.defineFlow(
       }
 
       const data = await response.json();
-      const content = data.choices[0]?.message?.content;
+      let content = data.choices[0]?.message?.content;
       
       if (!content) {
         throw new Error("Empty response received from AI model.");
       }
+
+      // Strip potential markdown backticks
+      content = content.replace(/```json\n?/, '').replace(/```\n?$/, '').trim();
 
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
@@ -153,18 +161,25 @@ const analyzeMedicalBillFlow = ai.defineFlow(
       
       const rawData = JSON.parse(jsonMatch[0]);
 
+      // STRICTOR NORMALIZATION LAYER
       const items = (rawData.items || []).map((item: any) => ({
-        item: item.item || "Unknown Item",
-        billedPrice: Number(item.billedPrice || 0),
-        fairPriceEstimate: Number(item.fairPriceEstimate || 0),
-        recommendation: item.recommendation || "Verify with local market rates.",
-        status: item.status || "unknown",
+        item: String(item.item || item.Item || "Unknown Item"),
+        billedPrice: Number(item.billedPrice ?? item.billed_price ?? item.Rate ?? 0),
+        fairPriceEstimate: Number(item.fairPriceEstimate ?? item.fair_price_estimate ?? 0),
+        recommendation: String(item.recommendation || item.Recommendation || "Verify with local market rates."),
+        status: (['overpriced', 'fair', 'undercharged', 'unknown'].includes(item.status || item.Status) 
+          ? (item.status || item.Status) 
+          : "unknown") as 'overpriced' | 'fair' | 'undercharged' | 'unknown',
       }));
+
+      const generalRecommendations = Array.isArray(rawData.generalRecommendations) 
+        ? rawData.generalRecommendations.map(String)
+        : (typeof rawData.generalRecommendations === 'string' ? [rawData.generalRecommendations] : ["Review bill for duplicate charges."]);
 
       return {
         items,
-        totalPossibleSavings: Number(rawData.totalPossibleSavings || 0),
-        generalRecommendations: rawData.generalRecommendations || ["Review bill for duplicate charges."],
+        totalPossibleSavings: Number(rawData.totalPossibleSavings ?? rawData.total_savings ?? 0),
+        generalRecommendations,
       };
     } catch (error: any) {
       console.error("Medical Bill Analysis Flow Error:", error);
