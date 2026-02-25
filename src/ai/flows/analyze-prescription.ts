@@ -36,8 +36,22 @@ const analyzePrescriptionFlow = ai.defineFlow(
   },
   async (input) => {
     try {
-      const prompt = `You are a medical assistant analyzing prescription text. Extract medicine details and return a JSON array of objects strictly matching the schema.
-      Return ONLY valid JSON.
+      const prompt = `You are a medical assistant analyzing prescription text. Extract medicine details.
+      
+      CRITICAL: You MUST return a JSON object with this exact structure:
+      {
+        "medicines": [
+          {
+            "name": "string",
+            "treats": "string",
+            "sideEffects": ["string"],
+            "drugInteractions": ["string"],
+            "cautions": ["string"]
+          }
+        ]
+      }
+
+      Return ONLY the JSON. No conversational text.
       
       Prescription Text:
       ${input.prescriptionText}`;
@@ -70,8 +84,23 @@ const analyzePrescriptionFlow = ai.defineFlow(
       }
 
       // Robust JSON extraction
-      const cleanedContent = content.replace(/```json\n?/, '').replace(/\n?```/, '').trim();
-      return JSON.parse(cleanedContent) as AnalyzePrescriptionOutput;
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Could not find valid JSON in AI response.");
+      }
+      
+      const rawData = JSON.parse(jsonMatch[0]);
+
+      // NORMALIZATION LAYER
+      const medicines = (rawData.medicines || rawData.medications || []).map((med: any) => ({
+        name: med.name || med.Name || med.medicine || "Unknown Medication",
+        treats: med.treats || med.Treats || med.indication || "Condition not identified",
+        sideEffects: med.sideEffects || med.side_effects || med.SideEffects || [],
+        drugInteractions: med.drugInteractions || med.drug_interactions || med.Interactions || [],
+        cautions: med.cautions || med.Cautions || med.warnings || ["Follow your doctor's instructions."],
+      }));
+
+      return { medicines };
     } catch (error: any) {
       console.error("Prescription Analysis Flow Error:", error);
       throw new Error(`Failed to analyze prescription: ${error.message}`);

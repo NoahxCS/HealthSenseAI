@@ -36,7 +36,22 @@ const analyzeMedicalBillFlow = ai.defineFlow(
   async (input) => {
     try {
       const prompt = `You are an expert medical bill analyst. Review the following OCR text and identify overpriced items compared to market rates. 
-      Return ONLY a JSON object matching the requested schema. Do not include any conversational text.
+      
+      CRITICAL: You MUST return a JSON object that strictly follows this schema:
+      {
+        "overpricedItems": [
+          {
+            "item": "string",
+            "billedPrice": number,
+            "fairPriceEstimate": number,
+            "recommendation": "string"
+          }
+        ],
+        "totalPossibleSavings": number,
+        "generalRecommendations": ["string"]
+      }
+
+      Return ONLY the JSON object. Do not include any conversational text or markdown formatting except for code blocks if necessary.
       
       Medical Bill OCR Text:
       ${input.ocrText}`;
@@ -68,9 +83,29 @@ const analyzeMedicalBillFlow = ai.defineFlow(
         throw new Error("Empty response received from AI model.");
       }
 
-      // Robust JSON extraction (handles markdown blocks)
-      const cleanedContent = content.replace(/```json\n?/, '').replace(/\n?```/, '').trim();
-      return JSON.parse(cleanedContent) as AnalyzeMedicalBillOutput;
+      // Robust JSON extraction
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        throw new Error("Could not find valid JSON in AI response.");
+      }
+      
+      const rawData = JSON.parse(jsonMatch[0]);
+
+      // NORMALIZATION LAYER: Map common AI hallucinations to the expected schema
+      const overpricedItems = (rawData.overpricedItems || rawData.overpriced_items || []).map((item: any) => ({
+        item: item.item || item.Item || "Unknown Item",
+        billedPrice: Number(item.billedPrice || item.billed_price || item.Rate || item.price || 0),
+        fairPriceEstimate: Number(item.fairPriceEstimate || item.fair_price_estimate || item.fair_price || 0),
+        recommendation: item.recommendation || item.Recommendation || "Compare with local market rates.",
+      }));
+
+      const normalizedData: AnalyzeMedicalBillOutput = {
+        overpricedItems,
+        totalPossibleSavings: Number(rawData.totalPossibleSavings || rawData.total_possible_savings || 0),
+        generalRecommendations: rawData.generalRecommendations || rawData.general_recommendations || ["Review your bill for duplicate charges."],
+      };
+
+      return normalizedData;
     } catch (error: any) {
       console.error("Medical Bill Analysis Flow Error:", error);
       throw new Error(`Failed to analyze medical bill: ${error.message}`);
