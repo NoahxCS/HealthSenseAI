@@ -67,7 +67,7 @@ const analyzeMedicalBillFlow = ai.defineFlow(
         body: JSON.stringify({
           model: "openrouter/free",
           messages: [{ role: "user", content: prompt }],
-          response_format: { type: "json_object" }
+          // REMOVED response_format: { type: "json_object" } because some free models don't support it
         })
       });
 
@@ -83,7 +83,7 @@ const analyzeMedicalBillFlow = ai.defineFlow(
         throw new Error("Empty response received from AI model.");
       }
 
-      // Robust JSON extraction
+      // Robust JSON extraction: look for the first '{' and the last '}'
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error("Could not find valid JSON in AI response.");
@@ -93,7 +93,7 @@ const analyzeMedicalBillFlow = ai.defineFlow(
 
       // NORMALIZATION LAYER: Map common AI hallucinations to the expected schema
       const overpricedItems = (rawData.overpricedItems || rawData.overpriced_items || []).map((item: any) => ({
-        item: item.item || item.Item || "Unknown Item",
+        item: item.item || item.Item || item.name || "Unknown Item",
         billedPrice: Number(item.billedPrice || item.billed_price || item.Rate || item.price || 0),
         fairPriceEstimate: Number(item.fairPriceEstimate || item.fair_price_estimate || item.fair_price || 0),
         recommendation: item.recommendation || item.Recommendation || "Compare with local market rates.",

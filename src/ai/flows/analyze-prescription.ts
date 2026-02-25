@@ -67,7 +67,7 @@ const analyzePrescriptionFlow = ai.defineFlow(
         body: JSON.stringify({
           model: "openrouter/free",
           messages: [{ role: "user", content: prompt }],
-          response_format: { type: "json_object" }
+          // REMOVED response_format: { type: "json_object" } because some free models don't support it
         })
       });
 
