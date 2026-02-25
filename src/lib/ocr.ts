@@ -1,36 +1,41 @@
+'use server';
 
 /**
- * OCR.space API integration helper
+ * OCR.space API integration helper (Server-side)
  */
 
-const OCR_API_KEY = process.env.NEXT_PUBLIC_OCR_API_KEY;
+const OCR_API_KEY = process.env.OCR_API_KEY || process.env.NEXT_PUBLIC_OCR_API_KEY;
 
 export interface OCRResult {
   text: string;
   error?: string;
 }
 
-export async function extractTextFromFile(file: File): Promise<OCRResult> {
-  if (!OCR_API_KEY) {
-    return { text: "", error: "OCR API Key is missing. Please check your environment variables." };
+export async function extractTextFromFile(formData: FormData): Promise<OCRResult> {
+  if (!OCR_API_KEY || OCR_API_KEY === 'your_ocr_api_key_here') {
+    return { 
+      text: "", 
+      error: "OCR API Key is missing or invalid. Please set OCR_API_KEY in your environment variables." 
+    };
   }
 
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("apikey", OCR_API_KEY);
-  formData.append("isOverlayRequired", "false");
-  formData.append("scale", "true");
-  formData.append("isTable", "true");
-  formData.append("detectOrientation", "true");
-
   try {
+    // We expect the 'file' to be already in the formData from the client
+    formData.append("apikey", OCR_API_KEY);
+    formData.append("isOverlayRequired", "false");
+    formData.append("scale", "true");
+    formData.append("isTable", "true");
+    formData.append("detectOrientation", "true");
+
     const response = await fetch("https://api.ocr.space/parse/image", {
       method: "POST",
       body: formData,
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      console.error("OCR API Error Response:", errorText);
+      throw new Error(`OCR Service Error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
@@ -41,13 +46,16 @@ export async function extractTextFromFile(file: File): Promise<OCRResult> {
 
     const parsedResults = data.ParsedResults;
     if (!parsedResults || parsedResults.length === 0) {
-      return { text: "", error: "No text found in the document." };
+      return { text: "", error: "No text found in the document. Please ensure the image is clear and contains text." };
     }
 
     const extractedText = parsedResults.map((result: any) => result.ParsedText).join("\n");
     return { text: extractedText };
   } catch (error: any) {
-    console.error("OCR Error:", error);
-    return { text: "", error: error.message || "Failed to extract text. Please check your internet connection." };
+    console.error("OCR Server Action Error:", error);
+    return { 
+      text: "", 
+      error: error.message || "Failed to extract text due to a server error." 
+    };
   }
 }

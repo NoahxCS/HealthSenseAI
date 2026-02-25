@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Upload, X, FileIcon, Loader2, Sparkles, AlertCircle } from "lucide-react";
+import { Upload, X, FileIcon, Loader2, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { extractTextFromFile } from "@/lib/ocr";
 import { analyzeMedicalBill } from "@/ai/flows/analyze-medical-bill";
@@ -43,8 +43,8 @@ export default function HealthSensePage() {
         const reader = new FileReader();
         reader.onload = () => setPreview(reader.result as string);
         reader.readAsDataURL(selectedFile);
-      } else if (selectedFile.type === "application/pdf") {
-        setPreview(null); // Generic PDF icon handled in render
+      } else {
+        setPreview(null);
       }
     }
   }, [toast]);
@@ -75,11 +75,16 @@ export default function HealthSensePage() {
       setProgress(20);
       setResults(null);
 
-      // 1. OCR Step
-      const ocrResult = await extractTextFromFile(file);
+      // 1. OCR Step via Server Action
+      const formData = new FormData();
+      formData.append("file", file);
+      
+      const ocrResult = await extractTextFromFile(formData);
+      
       if (ocrResult.error) {
         throw new Error(ocrResult.error);
       }
+      
       if (!ocrResult.text.trim()) {
         throw new Error("No readable text found in document. Please try a clearer image.");
       }
@@ -244,15 +249,13 @@ export default function HealthSensePage() {
             <h4 className="text-sm font-semibold text-primary uppercase tracking-wider">How it works</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
               HealthSense AI uses high-precision Optical Character Recognition (OCR) to read your medical documents. 
-              The text is then securely analyzed by Gemini AI to extract meaningful insights, identify potential billing errors, 
-              or explain complex medications in simple terms.
+              The text is then securely analyzed by Gemini AI to extract meaningful insights.
             </p>
           </div>
           <div className="flex-1 space-y-2">
             <h4 className="text-sm font-semibold text-primary uppercase tracking-wider">Privacy & Security</h4>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              We do not store your documents permanently. Analysis is performed in real-time, and files are discarded 
-              immediately after processing. Always consult with a healthcare professional before making any medical or financial decisions.
+              We do not store your documents permanently. Analysis is performed in real-time. Always consult with a healthcare professional.
             </p>
           </div>
         </div>
