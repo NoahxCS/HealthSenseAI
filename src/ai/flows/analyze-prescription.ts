@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview A Genkit flow for analyzing prescriptions via OpenRouter.
@@ -50,7 +49,7 @@ ${input.prescriptionText}`;
         "X-Title": "HealthSense AI"
       },
       body: JSON.stringify({
-        model: "qwen/qwen3-next-80b-a3b-instruct:free",
+        model: "openrouter/free",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" }
       })
