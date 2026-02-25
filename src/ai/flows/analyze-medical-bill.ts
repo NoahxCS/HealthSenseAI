@@ -2,6 +2,7 @@
 /**
  * @fileOverview A Genkit flow for analyzing medical bills via OpenRouter.
  * Updated to use Indian Rupee (₹) and a specific fair price reference.
+ * Refined logic to prevent false overcharge flags.
  */
 
 import { ai } from '@/ai/genkit';
@@ -89,12 +90,18 @@ const analyzeMedicalBillFlow = ai.defineFlow(
       `;
 
       const prompt = `You are an expert medical bill analyst specialized in Indian healthcare costs. 
-      Review the medical bill OCR text and identify overpriced items compared to the provided fair price reference. 
-      Use Indian Rupee (₹) for all currency values.
+      Review the medical bill OCR text and identify items that are overpriced based on the provided fair price reference. 
       
       ${fairPriceReference}
 
-      CRITICAL: You MUST return a JSON object that strictly follows this schema:
+      CRITICAL DEFINITION: 
+      - An item is "overpriced" ONLY if the billed price in the OCR text is SIGNIFICANTLY HIGHER than the UPPER BOUND of the reference range.
+      - If the billed price is WITHIN the range (e.g., 180 for Bandage) or BELOW the range (e.g., 100 for Bandage), it is NOT overpriced.
+      - DO NOT include items in "overpricedItems" if they are fairly charged or undercharged.
+
+      Use Indian Rupee (₹) for all currency values.
+
+      Return a JSON object:
       {
         "overpricedItems": [
           {
@@ -108,8 +115,6 @@ const analyzeMedicalBillFlow = ai.defineFlow(
         "generalRecommendations": ["string"]
       }
 
-      Return ONLY the JSON object. 
-      
       Medical Bill OCR Text:
       ${input.ocrText}`;
 
@@ -139,7 +144,6 @@ const analyzeMedicalBillFlow = ai.defineFlow(
         throw new Error("Empty response received from AI model.");
       }
 
-      // Extract JSON from potential markdown
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) {
         throw new Error("Could not find valid JSON in AI response.");
@@ -147,7 +151,7 @@ const analyzeMedicalBillFlow = ai.defineFlow(
       
       const rawData = JSON.parse(jsonMatch[0]);
 
-      // Normalization layer
+      // Normalization layer with safety checks
       const overpricedItems = (rawData.overpricedItems || rawData.overpriced_items || []).map((item: any) => ({
         item: item.item || item.Item || item.name || "Unknown Item",
         billedPrice: Number(item.billedPrice || item.billed_price || item.Rate || item.price || 0),
