@@ -67,7 +67,6 @@ const analyzePrescriptionFlow = ai.defineFlow(
         body: JSON.stringify({
           model: "openrouter/free",
           messages: [{ role: "user", content: prompt }],
-          // REMOVED response_format: { type: "json_object" } because some free models don't support it
         })
       });
 
@@ -91,13 +90,22 @@ const analyzePrescriptionFlow = ai.defineFlow(
       
       const rawData = JSON.parse(jsonMatch[0]);
 
+      // HELPER FOR ARRAY NORMALIZATION
+      const ensureArray = (val: any): string[] => {
+        if (Array.isArray(val)) return val.map(String);
+        if (typeof val === 'string' && val.trim()) return [val.trim()];
+        return [];
+      };
+
       // NORMALIZATION LAYER
       const medicines = (rawData.medicines || rawData.medications || []).map((med: any) => ({
-        name: med.name || med.Name || med.medicine || "Unknown Medication",
-        treats: med.treats || med.Treats || med.indication || "Condition not identified",
-        sideEffects: med.sideEffects || med.side_effects || med.SideEffects || [],
-        drugInteractions: med.drugInteractions || med.drug_interactions || med.Interactions || [],
-        cautions: med.cautions || med.Cautions || med.warnings || ["Follow your doctor's instructions."],
+        name: String(med.name || med.Name || med.medicine || "Unknown Medication"),
+        treats: String(med.treats || med.Treats || med.indication || "Condition not identified"),
+        sideEffects: ensureArray(med.sideEffects || med.side_effects || med.SideEffects),
+        drugInteractions: ensureArray(med.drugInteractions || med.drug_interactions || med.Interactions),
+        cautions: ensureArray(med.cautions || med.Cautions || med.warnings).length > 0 
+          ? ensureArray(med.cautions || med.Cautions || med.warnings) 
+          : ["Follow your doctor's instructions."],
       }));
 
       return { medicines };
