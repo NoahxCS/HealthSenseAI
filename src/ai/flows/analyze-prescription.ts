@@ -1,11 +1,7 @@
 
 'use server';
 /**
- * @fileOverview This file implements a Genkit flow for analyzing prescription text.
- *
- * - analyzePrescription - A function that handles the prescription analysis process.
- * - AnalyzePrescriptionInput - The input type for the analyze prescription function.
- * - AnalyzePrescriptionOutput - The return type for the analyze prescription function.
+ * @fileOverview A Genkit flow for analyzing prescriptions via OpenRouter.
  */
 
 import { ai } from '@/ai/genkit';
@@ -20,34 +16,18 @@ const AnalyzePrescriptionOutputSchema = z.object({
   medicines: z.array(
     z.object({
       name: z.string().describe('The name of the medicine.'),
-      treats: z.string().describe('What the medicine treats or its primary use.'),
-      sideEffects: z.array(z.string()).describe('A list of common or important side effects.'),
-      drugInteractions: z.array(z.string()).describe('A list of significant drug interactions.'),
-      cautions: z.array(z.string()).describe('A list of important cautions or warnings for the medicine.'),
+      treats: z.string().describe('What the medicine treats.'),
+      sideEffects: z.array(z.string()).describe('List of common side effects.'),
+      drugInteractions: z.array(z.string()).describe('Significant drug interactions.'),
+      cautions: z.array(z.string()).describe('Important cautions or warnings.'),
     })
-  ).describe('An array of identified medicines with their detailed analysis.'),
+  ).describe('An array of identified medicines.'),
 });
 export type AnalyzePrescriptionOutput = z.infer<typeof AnalyzePrescriptionOutputSchema>;
 
 export async function analyzePrescription(input: AnalyzePrescriptionInput): Promise<AnalyzePrescriptionOutput> {
   return analyzePrescriptionFlow(input);
 }
-
-const analyzePrescriptionPrompt = ai.definePrompt({
-  name: 'analyzePrescriptionPrompt',
-  input: { schema: AnalyzePrescriptionInputSchema },
-  output: { schema: AnalyzePrescriptionOutputSchema },
-  prompt: `You are a helpful medical assistant specializing in analyzing prescription information.
-Your task is to extract detailed information about each medicine mentioned in the provided text.
-For each medicine, identify its name, what it treats, its potential side effects, any significant drug interactions, and important cautions or warnings.
-
-Here is the prescription text:
----
-{{{prescriptionText}}}
----
-
-Extract the information and format it as a JSON array of medicine objects, strictly following the provided schema. If a piece of information is not present or cannot be determined, return an empty string or empty array for that field. Focus only on the medical information and do not include any conversational text or explanations outside the JSON.`,
-});
 
 const analyzePrescriptionFlow = ai.defineFlow(
   {
@@ -56,9 +36,33 @@ const analyzePrescriptionFlow = ai.defineFlow(
     outputSchema: AnalyzePrescriptionOutputSchema,
   },
   async (input) => {
-    const { output } = await analyzePrescriptionPrompt(input, {
-      model: 'googleai/gemini-2.0-flash-001',
+    const prompt = `You are a medical assistant analyzing prescription text. Extract medicine details and return a JSON array of objects strictly matching the schema.
+
+Prescription Text:
+${input.prescriptionText}`;
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://genkit.dev",
+        "X-Title": "HealthSense AI"
+      },
+      body: JSON.stringify({
+        model: "qwen/qwen3-next-80b-a3b-instruct:free",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" }
+      })
     });
-    return output!;
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`OpenRouter Error: ${error}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+    return JSON.parse(content) as AnalyzePrescriptionOutput;
   }
 );

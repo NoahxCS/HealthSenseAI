@@ -1,11 +1,7 @@
 
 'use server';
 /**
- * @fileOverview A Genkit flow for analyzing medical bills.
- *
- * - analyzeMedicalBill - A function that handles the medical bill analysis process.
- * - AnalyzeMedicalBillInput - The input type for the analyzeMedicalBill function.
- * - AnalyzeMedicalBillOutput - The return type for the analyzeMedicalBill function.
+ * @fileOverview A Genkit flow for analyzing medical bills via OpenRouter.
  */
 
 import { ai } from '@/ai/genkit';
@@ -21,32 +17,16 @@ const AnalyzeMedicalBillOutputSchema = z.object({
     item: z.string().describe('Name of the medical service or item.'),
     billedPrice: z.number().describe('The price billed for this item.'),
     fairPriceEstimate: z.number().describe('An estimated fair price for this item.'),
-    recommendation: z.string().describe('Specific recommendation for this item, e.g., "Negotiate for lower price based on fair estimate."'),
+    recommendation: z.string().describe('Specific recommendation for this item.'),
   })).describe('A list of items identified as potentially overpriced.'),
-  totalPossibleSavings: z.number().describe('The total estimated savings if all overpriced items are negotiated to their fair price estimates.'),
-  generalRecommendations: z.array(z.string()).describe('General recommendations for the user regarding their medical bill.'),
+  totalPossibleSavings: z.number().describe('The total estimated savings.'),
+  generalRecommendations: z.array(z.string()).describe('General recommendations.'),
 });
 export type AnalyzeMedicalBillOutput = z.infer<typeof AnalyzeMedicalBillOutputSchema>;
 
 export async function analyzeMedicalBill(input: AnalyzeMedicalBillInput): Promise<AnalyzeMedicalBillOutput> {
   return analyzeMedicalBillFlow(input);
 }
-
-const analyzeMedicalBillPrompt = ai.definePrompt({
-  name: 'analyzeMedicalBillPrompt',
-  input: { schema: AnalyzeMedicalBillInputSchema },
-  output: { schema: AnalyzeMedicalBillOutputSchema },
-  prompt: `You are an expert medical bill analyst. Your task is to carefully review the provided OCR text from a medical bill.
-Identify all medical services and items, their billed prices, and determine if any are potentially overpriced based on common market rates and typical charges.
-For any item you identify as potentially overpriced, provide a realistic fair price estimate.
-Calculate the total possible savings if all identified overpriced items were adjusted to their fair price estimates.
-Finally, provide general recommendations to the user about managing and disputing medical bills.
-
-Be precise with monetary values and ensure they are numbers. If a price is not clearly visible or estimable, use 0. Focus on accuracy and actionable advice.
-
-Medical Bill OCR Text:
-{{{ocrText}}}`,
-});
 
 const analyzeMedicalBillFlow = ai.defineFlow(
   {
@@ -55,9 +35,33 @@ const analyzeMedicalBillFlow = ai.defineFlow(
     outputSchema: AnalyzeMedicalBillOutputSchema,
   },
   async (input) => {
-    const { output } = await analyzeMedicalBillPrompt(input, {
-      model: 'googleai/gemini-2.0-flash-001',
+    const prompt = `You are an expert medical bill analyst. Review the following OCR text and identify overpriced items compared to market rates. Return a JSON object matching the requested schema.
+
+Medical Bill OCR Text:
+${input.ocrText}`;
+
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://genkit.dev",
+        "X-Title": "HealthSense AI"
+      },
+      body: JSON.stringify({
+        model: "qwen/qwen3-next-80b-a3b-instruct:free",
+        messages: [{ role: "user", content: prompt }],
+        response_format: { type: "json_object" }
+      })
     });
-    return output!;
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`OpenRouter Error: ${error}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0].message.content;
+    return JSON.parse(content) as AnalyzeMedicalBillOutput;
   }
 );
