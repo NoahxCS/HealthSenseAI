@@ -1,9 +1,9 @@
+
 /**
  * OCR.space API integration helper
  */
 
-// Replace with your actual OCR.space API key
-const OCR_API_KEY = "K84606990488957"; // K88349258288957
+const OCR_API_KEY = process.env.NEXT_PUBLIC_OCR_API_KEY || "K82976477288957";
 
 export interface OCRResult {
   text: string;
@@ -16,7 +16,7 @@ export async function extractTextFromFile(file: File): Promise<OCRResult> {
   formData.append("apikey", OCR_API_KEY);
   formData.append("isOverlayRequired", "false");
   formData.append("scale", "true");
-  formData.append("isTable", "true"); // Helpful for medical bills
+  formData.append("isTable", "true");
   formData.append("detectOrientation", "true");
 
   try {

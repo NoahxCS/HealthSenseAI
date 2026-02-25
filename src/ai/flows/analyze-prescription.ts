@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview This file implements a Genkit flow for analyzing prescription text.
@@ -55,7 +56,10 @@ const analyzePrescriptionFlow = ai.defineFlow(
     outputSchema: AnalyzePrescriptionOutputSchema,
   },
   async (input) => {
-    const { output } = await analyzePrescriptionPrompt(input);
+    // Using OpenRouter via the openai plugin
+    const { output } = await analyzePrescriptionPrompt(input, {
+      model: 'openai/google/gemini-2.0-flash-001',
+    });
     return output!;
   }
 );

@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A Genkit flow for analyzing medical bills.
@@ -52,14 +53,12 @@ const analyzeMedicalBillFlow = ai.defineFlow(
     name: 'analyzeMedicalBillFlow',
     inputSchema: AnalyzeMedicalBillInputSchema,
     outputSchema: AnalyzeMedicalBillOutputSchema,
-    // The user requested 'google/gemini-2.0-flash-exp:free' via OpenRouter.
-    // However, the Genkit initialization (src/ai/genkit.ts) only configures the Google AI plugin
-    // and modifying it to add OpenRouter is disallowed. Therefore, using the 'gemini-2.5-flash'
-    // model available via the configured Google AI plugin.
-    model: 'googleai/gemini-2.5-flash',
   },
   async (input) => {
-    const { output } = await analyzeMedicalBillPrompt(input);
+    // Using OpenRouter via the openai plugin
+    const { output } = await analyzeMedicalBillPrompt(input, {
+      model: 'openai/google/gemini-2.0-flash-001',
+    });
     return output!;
   }
 );
