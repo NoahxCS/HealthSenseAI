@@ -1,8 +1,7 @@
 'use server';
 /**
  * @fileOverview A Genkit flow for analyzing medical bills via OpenRouter.
- * Updated to use Indian Rupee (₹) and a specific fair price reference.
- * Refined logic to prevent false overcharge flags.
+ * Updated to process ALL items and categorize them by price status.
  */
 
 import { ai } from '@/ai/genkit';
@@ -13,13 +12,16 @@ const AnalyzeMedicalBillInputSchema = z.object({
 });
 export type AnalyzeMedicalBillInput = z.infer<typeof AnalyzeMedicalBillInputSchema>;
 
+const BillItemSchema = z.object({
+  item: z.string().describe('Name of the medical service or item.'),
+  billedPrice: z.number().describe('The price billed for this item in ₹.'),
+  fairPriceEstimate: z.number().describe('An estimated fair price for this item in ₹.'),
+  recommendation: z.string().describe('Specific recommendation for this item.'),
+  status: z.enum(['overpriced', 'fair', 'undercharged', 'unknown']).describe('The pricing status of the item.'),
+});
+
 const AnalyzeMedicalBillOutputSchema = z.object({
-  overpricedItems: z.array(z.object({
-    item: z.string().describe('Name of the medical service or item.'),
-    billedPrice: z.number().describe('The price billed for this item in ₹.'),
-    fairPriceEstimate: z.number().describe('An estimated fair price for this item in ₹.'),
-    recommendation: z.string().describe('Specific recommendation for this item.'),
-  })).describe('A list of items identified as potentially overpriced.'),
+  items: z.array(BillItemSchema).describe('A list of all items found in the bill.'),
   totalPossibleSavings: z.number().describe('The total estimated savings in ₹.'),
   generalRecommendations: z.array(z.string()).describe('General recommendations.'),
 });
@@ -90,25 +92,25 @@ const analyzeMedicalBillFlow = ai.defineFlow(
       `;
 
       const prompt = `You are an expert medical bill analyst specialized in Indian healthcare costs. 
-      Review the medical bill OCR text and identify items that are overpriced based on the provided fair price reference. 
+      Review the medical bill OCR text and list ALL items found. Categorize each item based on the fair price reference.
       
       ${fairPriceReference}
 
-      CRITICAL DEFINITION: 
-      - An item is "overpriced" ONLY if the billed price in the OCR text is SIGNIFICANTLY HIGHER than the UPPER BOUND of the reference range.
-      - If the billed price is WITHIN the range (e.g., 180 for Bandage) or BELOW the range (e.g., 100 for Bandage), it is NOT overpriced.
-      - DO NOT include items in "overpricedItems" if they are fairly charged or undercharged.
-
-      Use Indian Rupee (₹) for all currency values.
+      STATUS CRITERIA:
+      - 'overpriced': Billed price is SIGNIFICANTLY HIGHER than the UPPER BOUND of the reference range.
+      - 'fair': Billed price is WITHIN or slightly around the reference range.
+      - 'undercharged': Billed price is SIGNIFICANTLY LOWER than the lower bound.
+      - 'unknown': Item is not in the reference list.
 
       Return a JSON object:
       {
-        "overpricedItems": [
+        "items": [
           {
             "item": "string",
             "billedPrice": number,
             "fairPriceEstimate": number,
-            "recommendation": "string"
+            "recommendation": "string",
+            "status": "overpriced" | "fair" | "undercharged" | "unknown"
           }
         ],
         "totalPossibleSavings": number,
@@ -123,7 +125,7 @@ const analyzeMedicalBillFlow = ai.defineFlow(
         headers: {
           "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://genkit.dev",
+          "HTTP-Referer": "https://healthsense.ai",
           "X-Title": "HealthSense AI"
         },
         body: JSON.stringify({
@@ -151,21 +153,19 @@ const analyzeMedicalBillFlow = ai.defineFlow(
       
       const rawData = JSON.parse(jsonMatch[0]);
 
-      // Normalization layer with safety checks
-      const overpricedItems = (rawData.overpricedItems || rawData.overpriced_items || []).map((item: any) => ({
-        item: item.item || item.Item || item.name || "Unknown Item",
-        billedPrice: Number(item.billedPrice || item.billed_price || item.Rate || item.price || 0),
-        fairPriceEstimate: Number(item.fairPriceEstimate || item.fair_price_estimate || item.fair_price || 0),
-        recommendation: item.recommendation || item.Recommendation || "Compare with local market rates.",
+      const items = (rawData.items || []).map((item: any) => ({
+        item: item.item || "Unknown Item",
+        billedPrice: Number(item.billedPrice || 0),
+        fairPriceEstimate: Number(item.fairPriceEstimate || 0),
+        recommendation: item.recommendation || "Verify with local market rates.",
+        status: item.status || "unknown",
       }));
 
-      const normalizedData: AnalyzeMedicalBillOutput = {
-        overpricedItems,
-        totalPossibleSavings: Number(rawData.totalPossibleSavings || rawData.total_possible_savings || 0),
-        generalRecommendations: rawData.generalRecommendations || rawData.general_recommendations || ["Review your bill for duplicate charges."],
+      return {
+        items,
+        totalPossibleSavings: Number(rawData.totalPossibleSavings || 0),
+        generalRecommendations: rawData.generalRecommendations || ["Review bill for duplicate charges."],
       };
-
-      return normalizedData;
     } catch (error: any) {
       console.error("Medical Bill Analysis Flow Error:", error);
       throw new Error(`Failed to analyze medical bill: ${error.message}`);

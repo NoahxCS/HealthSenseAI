@@ -3,9 +3,10 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { FileText, Stethoscope, AlertTriangle, CheckCircle2, IndianRupee, Pill } from "lucide-react";
+import { FileText, Stethoscope, AlertTriangle, CheckCircle2, IndianRupee, Pill, Info, HelpCircle } from "lucide-react";
 import type { AnalyzeMedicalBillOutput } from "@/ai/flows/analyze-medical-bill";
 import type { AnalyzePrescriptionOutput } from "@/ai/flows/analyze-prescription";
+import { cn } from "@/lib/utils";
 
 interface AnalysisResultsProps {
   mode: "bill" | "prescription";
@@ -25,7 +26,7 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
               <FileText className="h-5 w-5" />
               <CardTitle className="text-xl">Bill Analysis Summary</CardTitle>
             </div>
-            <CardDescription>Estimated potential savings based on Indian market fair rates</CardDescription>
+            <CardDescription>Comprehensive review of all charges based on Indian market fair rates</CardDescription>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-accent/10 p-4 rounded-lg mb-6">
@@ -38,40 +39,71 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground italic">
                 <CheckCircle2 className="h-4 w-4 text-accent" />
-                Negotiating these items can significantly reduce your bill.
+                Items marked as 'Overcharged' are the primary targets for negotiation.
               </div>
             </div>
 
             <div className="space-y-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-amber-500" />
-                Overpriced Items Identified
+                Detailed Breakdown
               </h3>
               <div className="grid gap-3">
-                {billData.overpricedItems && billData.overpricedItems.length > 0 ? (
-                  billData.overpricedItems.map((item, idx) => (
-                    <div key={idx} className="border rounded-lg p-4 bg-white shadow-sm hover:border-primary/30 transition-colors">
-                      <div className="flex justify-between items-start mb-2">
-                        <span className="font-medium text-foreground">{item.item}</span>
-                        <Badge variant="destructive" className="ml-2">Overcharged</Badge>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-                        <div>
-                          <p className="text-muted-foreground">Billed Price</p>
-                          <p className="font-semibold">₹{(item.billedPrice ?? 0).toFixed(2)}</p>
+                {billData.items && billData.items.length > 0 ? (
+                  billData.items.map((item, idx) => {
+                    const isOverpriced = item.status === 'overpriced';
+                    const isFair = item.status === 'fair' || item.status === 'undercharged';
+                    
+                    return (
+                      <div 
+                        key={idx} 
+                        className={cn(
+                          "border rounded-lg p-4 bg-white shadow-sm transition-colors",
+                          isOverpriced ? "border-red-200 bg-red-50/30" : isFair ? "border-green-100 bg-green-50/20" : "border-slate-200"
+                        )}
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <span className="font-medium text-foreground">{item.item}</span>
+                          <Badge 
+                            variant={isOverpriced ? "destructive" : isFair ? "secondary" : "outline"}
+                            className={cn(
+                              "ml-2",
+                              isFair && "bg-green-100 text-green-700 hover:bg-green-200 border-transparent",
+                              item.status === 'unknown' && "bg-amber-50 text-amber-700 border-amber-200"
+                            )}
+                          >
+                            {item.status.toUpperCase()}
+                          </Badge>
                         </div>
-                        <div>
-                          <p className="text-muted-foreground">Fair Estimate</p>
-                          <p className="font-semibold text-green-600">₹{(item.fairPriceEstimate ?? 0).toFixed(2)}</p>
+                        <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                          <div>
+                            <p className="text-muted-foreground">Billed Price</p>
+                            <p className="font-semibold">₹{(item.billedPrice ?? 0).toFixed(2)}</p>
+                          </div>
+                          {item.status !== 'unknown' && (
+                            <div>
+                              <p className="text-muted-foreground">Fair Estimate</p>
+                              <p className={cn(
+                                "font-semibold",
+                                isOverpriced ? "text-red-600" : "text-green-600"
+                              )}>
+                                ₹{(item.fairPriceEstimate ?? 0).toFixed(2)}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2 items-start text-sm text-muted-foreground bg-white/50 p-2 rounded border-l-2 border-slate-300">
+                          {isOverpriced ? <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" /> : 
+                           isFair ? <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0 mt-0.5" /> :
+                           <HelpCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />}
+                          <p>{item.recommendation}</p>
                         </div>
                       </div>
-                      <p className="text-sm text-muted-foreground bg-slate-50 p-2 rounded border-l-2 border-primary">
-                        {item.recommendation}
-                      </p>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
-                  <p className="text-muted-foreground italic">No significantly overpriced items detected based on typical charges.</p>
+                  <div className="text-center py-10 border-2 border-dashed rounded-lg">
+                    <p className="text-muted-foreground italic">No billing items detected.</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -79,7 +111,10 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
             <Separator className="my-6" />
 
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">General Recommendations</h3>
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <Info className="h-5 w-5 text-primary" />
+                General Recommendations
+              </h3>
               <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
                 {billData.generalRecommendations && billData.generalRecommendations.length > 0 ? (
                   billData.generalRecommendations.map((rec, idx) => (
