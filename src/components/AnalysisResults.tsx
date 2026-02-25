@@ -33,7 +33,7 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
                 <p className="text-sm text-muted-foreground">Total Possible Savings</p>
                 <p className="text-3xl font-bold text-primary flex items-center justify-center md:justify-start">
                   <DollarSign className="h-6 w-6" />
-                  {billData.totalPossibleSavings.toFixed(2)}
+                  {(billData.totalPossibleSavings ?? 0).toFixed(2)}
                 </p>
               </div>
               <div className="flex items-center gap-2 text-sm text-muted-foreground italic">
@@ -48,7 +48,7 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
                 Overpriced Items Identified
               </h3>
               <div className="grid gap-3">
-                {billData.overpricedItems.length > 0 ? (
+                {billData.overpricedItems && billData.overpricedItems.length > 0 ? (
                   billData.overpricedItems.map((item, idx) => (
                     <div key={idx} className="border rounded-lg p-4 bg-white shadow-sm hover:border-primary/30 transition-colors">
                       <div className="flex justify-between items-start mb-2">
@@ -58,11 +58,11 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
                       <div className="grid grid-cols-2 gap-4 text-sm mb-3">
                         <div>
                           <p className="text-muted-foreground">Billed Price</p>
-                          <p className="font-semibold">${item.billedPrice.toFixed(2)}</p>
+                          <p className="font-semibold">${(item.billedPrice ?? 0).toFixed(2)}</p>
                         </div>
                         <div>
                           <p className="text-muted-foreground">Fair Estimate</p>
-                          <p className="font-semibold text-green-600">${item.fairPriceEstimate.toFixed(2)}</p>
+                          <p className="font-semibold text-green-600">${(item.fairPriceEstimate ?? 0).toFixed(2)}</p>
                         </div>
                       </div>
                       <p className="text-sm text-muted-foreground bg-slate-50 p-2 rounded border-l-2 border-primary">
@@ -81,9 +81,13 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
             <div className="space-y-4">
               <h3 className="font-semibold text-lg">General Recommendations</h3>
               <ul className="list-disc list-inside space-y-2 text-sm text-muted-foreground">
-                {billData.generalRecommendations.map((rec, idx) => (
-                  <li key={idx}>{rec}</li>
-                ))}
+                {billData.generalRecommendations && billData.generalRecommendations.length > 0 ? (
+                  billData.generalRecommendations.map((rec, idx) => (
+                    <li key={idx}>{rec}</li>
+                  ))
+                ) : (
+                  <li className="italic">Standard billing review recommended.</li>
+                )}
               </ul>
             </div>
           </CardContent>
@@ -104,7 +108,7 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
           <CardDescription>Details for identified medications in your prescription</CardDescription>
         </CardHeader>
         <CardContent className="pt-6 space-y-6">
-          {prescriptionData.medicines.length > 0 ? (
+          {prescriptionData.medicines && prescriptionData.medicines.length > 0 ? (
             prescriptionData.medicines.map((med, idx) => (
               <div key={idx} className="group border rounded-lg overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
                 <div className="bg-slate-50 p-4 border-b flex items-center justify-between">
@@ -119,7 +123,7 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
                     <div>
                       <h4 className="text-sm font-semibold text-foreground uppercase tracking-wider mb-2">Common Side Effects</h4>
                       <div className="flex flex-wrap gap-1">
-                        {med.sideEffects.length > 0 ? med.sideEffects.map((effect, i) => (
+                        {med.sideEffects && med.sideEffects.length > 0 ? med.sideEffects.map((effect, i) => (
                           <Badge key={i} variant="outline" className="text-xs font-normal border-slate-200">{effect}</Badge>
                         )) : <span className="text-xs text-muted-foreground">None listed</span>}
                       </div>
@@ -127,7 +131,7 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
                     <div>
                       <h4 className="text-sm font-semibold text-amber-700 uppercase tracking-wider mb-2">Drug Interactions</h4>
                       <ul className="text-xs space-y-1 list-disc list-inside text-muted-foreground">
-                        {med.drugInteractions.length > 0 ? med.drugInteractions.map((item, i) => (
+                        {med.drugInteractions && med.drugInteractions.length > 0 ? med.drugInteractions.map((item, i) => (
                           <li key={i}>{item}</li>
                         )) : <li>No major interactions identified</li>}
                       </ul>
@@ -139,7 +143,7 @@ export function AnalysisResults({ mode, data }: AnalysisResultsProps) {
                       Important Cautions
                     </h4>
                     <ul className="text-xs space-y-2 text-amber-800">
-                      {med.cautions.length > 0 ? med.cautions.map((caution, i) => (
+                      {med.cautions && med.cautions.length > 0 ? med.cautions.map((caution, i) => (
                         <li key={i} className="leading-relaxed">• {caution}</li>
                       )) : <li className="italic">Standard precautions apply.</li>}
                     </ul>
