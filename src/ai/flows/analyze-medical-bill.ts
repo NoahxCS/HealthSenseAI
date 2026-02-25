@@ -55,9 +55,8 @@ const analyzeMedicalBillFlow = ai.defineFlow(
     outputSchema: AnalyzeMedicalBillOutputSchema,
   },
   async (input) => {
-    // Using OpenRouter via the openai plugin
     const { output } = await analyzeMedicalBillPrompt(input, {
-      model: 'openai/google/gemini-2.0-flash-001',
+      model: 'googleai/gemini-2.0-flash-001',
     });
     return output!;
   }

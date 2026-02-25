@@ -4,8 +4,8 @@
  * @fileOverview This file implements a Genkit flow for analyzing prescription text.
  *
  * - analyzePrescription - A function that handles the prescription analysis process.
- * - AnalyzePrescriptionInput - The input type for the analyzePrescription function.
- * - AnalyzePrescriptionOutput - The return type for the analyzePrescription function.
+ * - AnalyzePrescriptionInput - The input type for the analyze prescription function.
+ * - AnalyzePrescriptionOutput - The return type for the analyze prescription function.
  */
 
 import { ai } from '@/ai/genkit';
@@ -56,9 +56,8 @@ const analyzePrescriptionFlow = ai.defineFlow(
     outputSchema: AnalyzePrescriptionOutputSchema,
   },
   async (input) => {
-    // Using OpenRouter via the openai plugin
     const { output } = await analyzePrescriptionPrompt(input, {
-      model: 'openai/google/gemini-2.0-flash-001',
+      model: 'googleai/gemini-2.0-flash-001',
     });
     return output!;
   }
