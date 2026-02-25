@@ -1,0 +1,16 @@
+{
+  "placeholderImages": [
+    {
+      "id": "medical-bill",
+      "description": "Example medical bill document for OCR demonstration",
+      "imageUrl": "https://picsum.photos/seed/medbill/600/800",
+      "imageHint": "medical bill"
+    },
+    {
+      "id": "prescription",
+      "description": "Example medical prescription document for AI analysis",
+      "imageUrl": "https://picsum.photos/seed/rx/600/800",
+      "imageHint": "medical prescription"
+    }
+  ]
+}
